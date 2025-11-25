@@ -34,6 +34,34 @@ type User struct {
 	Role     string `json:"role"`
 }
 
+type Category struct {
+	CategoryID   int    `json:"category_id"`
+	CategoryName string `json:"category_name"`
+}
+
+type Order struct {
+	OrderID     int     `json:"order_id"`
+	OrderDate   string  `json:"order_date"`
+	ShipAddress string  `json:"ship_address"`
+	UserID      int     `json:"user_id"`
+	TotalAmount float64 `json:"total_amount"`
+}
+type OrderItem struct {
+	OrderItemID int     `json:"order_item_id"`
+	UnitPrice   float64 `json:"unit_price"`
+	Quantity    int     `json:"quantity"`
+	OrderID     int     `json:"order_id"`
+	ProductID   int     `json:"product_id"`
+}
+
+type Review struct {
+	ReviewID  int    `json:"review_id"`
+	Text      string `json:"text"`
+	UserID    int    `json:"user_id"`
+	ProductID int    `json:"product_id"`
+	OrderID   int    `json:"order_id"`
+}
+
 var DB *sql.DB
 
 func ConnectDB() {
@@ -65,6 +93,30 @@ func main() {
 	r.POST("/users", CreateUser)
 	r.PUT("/users/:id", UpdateUser)
 	r.DELETE("/users/:id", DeleteUser)
+
+	r.GET("/categories", GetCategories)
+	r.GET("/categories/:id", GetCategory)
+	r.POST("/categories", CreateCategory)
+	r.PUT("/categories/:id", UpdateCategory)
+	r.DELETE("/categories/:id", DeleteCategory)
+
+	r.GET("/orders", GetOrders)
+	r.GET("/orders/:id", GetOrder)
+	r.POST("/orders", CreateOrder)
+	r.PUT("/orders/:id", UpdateOrder)
+	r.DELETE("/orders/:id", DeleteOrder)
+
+	r.GET("/order-items", GetOrderItems)
+	r.GET("/order-items/:id", GetOrderItem)
+	r.POST("/order-items", CreateOrderItem)
+	r.PUT("/order-items/:id", UpdateOrderItem)
+	r.DELETE("/order-items/:id", DeleteOrderItem)
+
+	r.GET("/reviews", GetReviews)
+	r.GET("/reviews/:id", GetReview)
+	r.POST("/reviews", CreateReview)
+	r.PUT("/reviews/:id", UpdateReview)
+	r.DELETE("/reviews/:id", DeleteReview)
 
 	r.Run(":8080")
 }
@@ -140,7 +192,7 @@ func UpdateProduct(c *gin.Context) {
 	}
 
 	_, err := DB.Exec(`UPDATE products 
-		SET product_name=?, price=?, number=?, detail=?, status=?, size=?, gender=?, color=?, cate_id=?, user_id=?, image=? 
+		SET product_name=?, price=?, number=?, detail=?, status=?, size=?, gender=?, color=?, category_id=?, user_id=?, image=? 
 		WHERE id=?`,
 		p.ProductName, p.Price, p.Number, p.Detail, p.Status, p.Size, p.Gender, p.Color, p.CateID, p.UserID, p.Image, id)
 
@@ -230,7 +282,7 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	_, err := DB.Exec(`UPDATE users SET name=?, phone=?, address=?, username=?, password=?, role=? WHERE user_id=?`,
+	_, err := DB.Exec(`UPDATE users SET name=?, phone=?, address=?, username=?, password=?, role=? WHERE id=?`,
 		u.Name, u.Phone, u.Address, u.Username, u.Password, u.Role, id)
 
 	if err != nil {
