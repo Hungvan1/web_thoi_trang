@@ -95,28 +95,28 @@ func main() {
 	r.DELETE("/users/:id", DeleteUser)
 
 	r.GET("/categories", GetCategories)
-	r.GET("/categories/:id", GetCategory)
+	//r.GET("/categories/:id", GetCategory)
 	r.POST("/categories", CreateCategory)
 	r.PUT("/categories/:id", UpdateCategory)
 	r.DELETE("/categories/:id", DeleteCategory)
 
 	r.GET("/orders", GetOrders)
-	r.GET("/orders/:id", GetOrder)
+	//r.GET("/orders/:id", GetOrder)
 	r.POST("/orders", CreateOrder)
 	r.PUT("/orders/:id", UpdateOrder)
 	r.DELETE("/orders/:id", DeleteOrder)
 
-	r.GET("/order-items", GetOrderItems)
-	r.GET("/order-items/:id", GetOrderItem)
-	r.POST("/order-items", CreateOrderItem)
-	r.PUT("/order-items/:id", UpdateOrderItem)
-	r.DELETE("/order-items/:id", DeleteOrderItem)
+	// r.GET("/order-items", GetOrderItems)
+	// r.GET("/order-items/:id", GetOrderItem)
+	// r.POST("/order-items", CreateOrderItem)
+	// r.PUT("/order-items/:id", UpdateOrderItem)
+	// r.DELETE("/order-items/:id", DeleteOrderItem)
 
-	r.GET("/reviews", GetReviews)
-	r.GET("/reviews/:id", GetReview)
-	r.POST("/reviews", CreateReview)
-	r.PUT("/reviews/:id", UpdateReview)
-	r.DELETE("/reviews/:id", DeleteReview)
+	// r.GET("/reviews", GetReviews)
+	// r.GET("/reviews/:id", GetReview)
+	// r.POST("/reviews", CreateReview)
+	// r.PUT("/reviews/:id", UpdateReview)
+	// r.DELETE("/reviews/:id", DeleteReview)
 
 	r.Run(":8080")
 }
@@ -302,4 +302,210 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+}
+
+// GET all categories
+func GetCategories(c *gin.Context) {
+	rows, err := DB.Query("SELECT * FROM category")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var categories []Category
+	for rows.Next() {
+		var cat Category
+		if err := rows.Scan(&cat.CategoryID, &cat.CategoryName); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		categories = append(categories, cat)
+	}
+	c.JSON(http.StatusOK, categories)
+}
+
+// GET one category
+func GetCategoryByID(c *gin.Context) {
+	id := c.Param("id")
+
+	var cat Category
+	err := DB.QueryRow("SELECT category_id, category_name FROM category WHERE category_id = ?", id).
+		Scan(&cat.CategoryID, &cat.CategoryName)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, cat)
+}
+
+// POST create category
+func CreateCategory(c *gin.Context) {
+	var cat Category
+	if err := c.ShouldBindJSON(&cat); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec("INSERT INTO category (category_name) VALUES (?)", cat.CategoryName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Category created successfully"})
+}
+
+// PUT update category
+func UpdateCategory(c *gin.Context) {
+	id := c.Param("id")
+	var cat Category
+
+	if err := c.ShouldBindJSON(&cat); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec("UPDATE category SET category_name = ? WHERE category_id = ?", cat.CategoryName, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Category updated successfully"})
+}
+
+// DELETE category
+func DeleteCategory(c *gin.Context) {
+	id := c.Param("id")
+
+	_, err := DB.Exec("DELETE FROM category WHERE category_id = ?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
+}
+
+// GET all orders
+func GetOrders(c *gin.Context) {
+	rows, err := DB.Query("SELECT * FROM orders")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var orders []Order
+	for rows.Next() {
+		var o Order
+		if err := rows.Scan(
+			&o.OrderID, &o.OrderDate, &o.ShipAddress, &o.UserID, &o.TotalAmount,
+		); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		orders = append(orders, o)
+	}
+	c.JSON(http.StatusOK, orders)
+}
+
+// GET one order
+func GetOrderByID(c *gin.Context) {
+	id := c.Param("id")
+
+	var o Order
+	err := DB.QueryRow("SELECT order_id, order_date, ship_address, user_id, total_amount FROM orders WHERE order_id = ?", id).
+		Scan(&o.OrderID, &o.OrderDate, &o.ShipAddress, &o.UserID, &o.TotalAmount)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, o)
+}
+
+// POST create order
+func CreateOrder(c *gin.Context) {
+	var o Order
+
+	if err := c.ShouldBindJSON(&o); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec(
+		"INSERT INTO orders (order_date, ship_address, user_id, total_amount) VALUES (?, ?, ?, ?)",
+		o.OrderDate, o.ShipAddress, o.UserID, o.TotalAmount,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order created successfully"})
+}
+
+// PUT update order
+func UpdateOrder(c *gin.Context) {
+	id := c.Param("id")
+	var o Order
+
+	if err := c.ShouldBindJSON(&o); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec(
+		"UPDATE orders SET order_date = ?, ship_address = ?, user_id = ?, total_amount = ? WHERE order_id = ?",
+		o.OrderDate, o.ShipAddress, o.UserID, o.TotalAmount, id,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order updated successfully"})
+}
+
+// DELETE order
+func DeleteOrder(c *gin.Context) {
+	id := c.Param("id")
+
+	_, err := DB.Exec("DELETE FROM orders WHERE order_id = ?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order deleted successfully"})
+}
+
+// GET all reviews
+func GetReviews(c *gin.Context) {
+	rows, err := DB.Query("SELECT * FROM review")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var reviews []Review
+	for rows.Next() {
+		var r Review
+		if err := rows.Scan(
+			&r.ReviewID, &r.Text, &r.UserID, &r.ProductID, &r.OrderID,
+		); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		reviews = append(reviews, r)
+	}
+	c.JSON(http.StatusOK, reviews)
 }
