@@ -95,28 +95,28 @@ func main() {
 	r.DELETE("/users/:id", DeleteUser)
 
 	r.GET("/categories", GetCategories)
-	//r.GET("/categories/:id", GetCategory)
+	r.GET("/categories/:id", GetCategory)
 	r.POST("/categories", CreateCategory)
 	r.PUT("/categories/:id", UpdateCategory)
 	r.DELETE("/categories/:id", DeleteCategory)
 
 	r.GET("/orders", GetOrders)
-	//r.GET("/orders/:id", GetOrder)
+	r.GET("/orders/:id", GetOrder)
 	r.POST("/orders", CreateOrder)
 	r.PUT("/orders/:id", UpdateOrder)
 	r.DELETE("/orders/:id", DeleteOrder)
 
-	// r.GET("/order-items", GetOrderItems)
-	// r.GET("/order-items/:id", GetOrderItem)
-	// r.POST("/order-items", CreateOrderItem)
-	// r.PUT("/order-items/:id", UpdateOrderItem)
-	// r.DELETE("/order-items/:id", DeleteOrderItem)
+	r.GET("/order_items", GetOrderItems)
+	r.GET("/order_items/:id", GetOrderItem)
+	r.POST("/order_items", CreateOrderItem)
+	r.PUT("/order_items/:id", UpdateOrderItem)
+	r.DELETE("/order_items/:id", DeleteOrderItem)
 
-	// r.GET("/reviews", GetReviews)
-	// r.GET("/reviews/:id", GetReview)
-	// r.POST("/reviews", CreateReview)
-	// r.PUT("/reviews/:id", UpdateReview)
-	// r.DELETE("/reviews/:id", DeleteReview)
+	r.GET("/reviews", GetReviews)
+	r.GET("/reviews/:id", GetReview)
+	r.POST("/reviews", CreateReview)
+	r.PUT("/reviews/:id", UpdateReview)
+	r.DELETE("/reviews/:id", DeleteReview)
 
 	r.Run(":8080")
 }
@@ -326,11 +326,11 @@ func GetCategories(c *gin.Context) {
 }
 
 // GET one category
-func GetCategoryByID(c *gin.Context) {
+func GetCategory(c *gin.Context) {
 	id := c.Param("id")
 
 	var cat Category
-	err := DB.QueryRow("SELECT category_id, category_name FROM category WHERE category_id = ?", id).
+	err := DB.QueryRow("SELECT * FROM category WHERE id = ?", id).
 		Scan(&cat.CategoryID, &cat.CategoryName)
 
 	if err != nil {
@@ -368,7 +368,7 @@ func UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	_, err := DB.Exec("UPDATE category SET category_name = ? WHERE category_id = ?", cat.CategoryName, id)
+	_, err := DB.Exec("UPDATE category SET category_name = ? WHERE id = ?", cat.CategoryName, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -381,7 +381,7 @@ func UpdateCategory(c *gin.Context) {
 func DeleteCategory(c *gin.Context) {
 	id := c.Param("id")
 
-	_, err := DB.Exec("DELETE FROM category WHERE category_id = ?", id)
+	_, err := DB.Exec("DELETE FROM category WHERE id = ?", id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -414,11 +414,11 @@ func GetOrders(c *gin.Context) {
 }
 
 // GET one order
-func GetOrderByID(c *gin.Context) {
+func GetOrder(c *gin.Context) {
 	id := c.Param("id")
 
 	var o Order
-	err := DB.QueryRow("SELECT order_id, order_date, ship_address, user_id, total_amount FROM orders WHERE order_id = ?", id).
+	err := DB.QueryRow("SELECT * FROM orders WHERE id = ?", id).
 		Scan(&o.OrderID, &o.OrderDate, &o.ShipAddress, &o.UserID, &o.TotalAmount)
 
 	if err != nil {
@@ -462,7 +462,7 @@ func UpdateOrder(c *gin.Context) {
 	}
 
 	_, err := DB.Exec(
-		"UPDATE orders SET order_date = ?, ship_address = ?, user_id = ?, total_amount = ? WHERE order_id = ?",
+		"UPDATE orders SET order_date = ?, ship_address = ?, user_id = ?, total_amount = ? WHERE id = ?",
 		o.OrderDate, o.ShipAddress, o.UserID, o.TotalAmount, id,
 	)
 
@@ -478,13 +478,111 @@ func UpdateOrder(c *gin.Context) {
 func DeleteOrder(c *gin.Context) {
 	id := c.Param("id")
 
-	_, err := DB.Exec("DELETE FROM orders WHERE order_id = ?", id)
+	_, err := DB.Exec("DELETE FROM orders WHERE id = ?", id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order deleted successfully"})
+}
+
+// GET all orderitem
+func GetOrderItems(c *gin.Context) {
+	rows, err := DB.Query("SELECT * FROM order_items")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var items []OrderItem
+	for rows.Next() {
+		var it OrderItem
+		if err := rows.Scan(
+			&it.OrderItemID, &it.UnitPrice, &it.Quantity,
+			&it.OrderID, &it.ProductID,
+		); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, it)
+	}
+	c.JSON(http.StatusOK, items)
+}
+
+// Get one orderitem
+func GetOrderItem(c *gin.Context) {
+	id := c.Param("id")
+
+	var it OrderItem
+	err := DB.QueryRow(
+		"SELECT * FROM order_items WHERE id = ?",
+		id,
+	).Scan(&it.OrderItemID, &it.UnitPrice, &it.Quantity, &it.OrderID, &it.ProductID)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order item not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, it)
+}
+
+// POST orderitem
+func CreateOrderItem(c *gin.Context) {
+	var it OrderItem
+
+	if err := c.ShouldBindJSON(&it); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec(
+		"INSERT INTO order_items (unit_price, quantity, order_id, product_id) VALUES (?, ?, ?, ?)",
+		it.UnitPrice, it.Quantity, it.OrderID, it.ProductID,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order item created successfully"})
+}
+
+// PUT orderitem
+func UpdateOrderItem(c *gin.Context) {
+	id := c.Param("id")
+	var it OrderItem
+
+	if err := c.ShouldBindJSON(&it); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec(
+		"UPDATE order_items SET unit_price = ?, quantity = ?, order_id = ?, product_id = ? WHERE id = ?",
+		it.UnitPrice, it.Quantity, it.OrderID, it.ProductID, id,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order item updated successfully"})
+}
+
+// DELETE orderitem
+func DeleteOrderItem(c *gin.Context) {
+	id := c.Param("id")
+
+	_, err := DB.Exec("DELETE FROM order_items WHERE id = ?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order item deleted successfully"})
 }
 
 // GET all reviews
@@ -508,4 +606,78 @@ func GetReviews(c *gin.Context) {
 		reviews = append(reviews, r)
 	}
 	c.JSON(http.StatusOK, reviews)
+}
+
+// GET one review
+func GetReview(c *gin.Context) {
+	id := c.Param("id")
+
+	var r Review
+	err := DB.QueryRow(
+		"SELECT * FROM review WHERE review_id = ?",
+		id,
+	).Scan(&r.ReviewID, &r.Text, &r.UserID, &r.ProductID, &r.OrderID)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, r)
+}
+
+// POST review
+func CreateReview(c *gin.Context) {
+	var r Review
+
+	if err := c.ShouldBindJSON(&r); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec(
+		"INSERT INTO review (text, user_id, product_id, order_id) VALUES (?, ?, ?, ?)",
+		r.Text, r.UserID, r.ProductID, r.OrderID,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Review created successfully"})
+}
+
+// PUT review
+func UpdateReview(c *gin.Context) {
+	id := c.Param("id")
+	var r Review
+
+	if err := c.ShouldBindJSON(&r); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := DB.Exec(
+		"UPDATE review SET text = ?, user_id = ?, product_id = ?, order_id = ? WHERE review_id = ?",
+		r.Text, r.UserID, r.ProductID, r.OrderID, id,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Review updated successfully"})
+}
+
+// DELETE review
+func DeleteReview(c *gin.Context) {
+	id := c.Param("id")
+
+	_, err := DB.Exec("DELETE FROM review WHERE review_id = ?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Review deleted successfully"})
 }
